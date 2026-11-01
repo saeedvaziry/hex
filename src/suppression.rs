@@ -489,6 +489,18 @@ fn input_is_down(state: u32, code: u16) -> bool {
     }
 }
 
+/// Whether a tracked key or button is still held, for stale-key repair.
+///
+/// The combined session state alone is not enough: when the window server
+/// consumes a release (Command-Tab's Tab, Command-Q's Q), that state can keep
+/// the key down indefinitely while the hardware reads it up (#612, seen on
+/// macOS 27: combined held Tab for hours, HID none). Repair then never ran and
+/// every modifier-only press logged "a tracked key is physically down" until
+/// Hex restarted. A key counts as held only while the HID system state agrees.
+fn input_is_held(code: u16) -> bool {
+    input_is_down(COMBINED_SESSION_STATE, code) && input_is_down(HID_SYSTEM_STATE, code)
+}
+
 /// What the observation tap adds in builds with captures, while the
 /// `capture` experiment is on: the pointer moving and scrolling. Clicks and
 /// drags already reach the key tap, for mouse shortcuts. The callback drops
@@ -1551,7 +1563,7 @@ impl PhysicalKeyboard {
         Self {
             // SAFETY: Read-only queries of a documented event-source state.
             flags: || unsafe { CGEventSourceFlagsState(COMBINED_SESSION_STATE) },
-            key_down: |code| unsafe { CGEventSourceKeyState(COMBINED_SESSION_STATE, code) },
+            key_down: input_is_held,
         }
     };
 }
@@ -1740,7 +1752,7 @@ impl DictationHotkey {
             CaptureInstant::now,
             // Match the annotated-session tap, including assistive keyboard input.
             || unsafe { CGEventSourceFlagsState(COMBINED_SESSION_STATE) },
-            |code| input_is_down(COMBINED_SESSION_STATE, code),
+            input_is_held,
         );
     }
 

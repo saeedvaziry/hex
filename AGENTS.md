@@ -652,8 +652,12 @@ CoreAudio formats, AppleScript details, or event serialization.
   as a fresh press (a lock stays locked, so the press finishes it) only if a
   modifier-change event reported no modifiers after each tracked key's own
   press (typing in between is fine), only the binding's modifiers went down
-  since, and every tracked key and every other modifier reads up in
-  combined-session state (Fn metadata as below). It fences input stamped
+  since, and every other modifier reads up in combined-session state (Fn
+  metadata as below) and every tracked key reads up in combined-session or
+  HID state. Both the scan and this check count a key as held only while the
+  HID state agrees, since the combined-session state can keep a key whose
+  release the window server consumed (Command-Tab's Tab) down for hours
+  (#612). It fences input stamped
   before the press, not at it, so a same-tick chord still discards, and keeps
   the binding's key safe from an older delayed release. Fenced edges, edges
   from before a disabled tap, and a suspension leave no modifier evidence.
